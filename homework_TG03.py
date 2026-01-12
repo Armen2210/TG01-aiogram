@@ -15,13 +15,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
+
 
 if not BOT_TOKEN:
     raise RuntimeError("Не найден BOT_TOKEN в .env (добавь строку BOT_TOKEN=...)")
 
-if not OPENWEATHER_API_KEY:
-    raise RuntimeError("Не найден OPENWEATHER_API_KEY в .env (добавь строку OPENWEATHER_API_KEY=...)")
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
@@ -31,18 +29,17 @@ logging.basicConfig(level=logging.INFO)
 class Form(StatesGroup):
   name = State()
   age = State()
-  city = State()
-
+  grade = State()
 
 def init_db():
-    conn = sqlite3.connect('user_data.db')
+    conn = sqlite3.connect('school_data.db')
     cur = conn.cursor()
     cur.execute('''
-    CREATE TABLE IF NOT EXISTS users (
+    CREATE TABLE IF NOT EXISTS students (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     age INTEGER NOT NULL,
-    city TEXT NOT NULL)
+    grade TEXT NOT NULL)
     ''')
 
     conn.commit() # сохраняем изменения
@@ -64,40 +61,27 @@ async def name(message: Message, state: FSMContext):
 @dp.message(Form.age)
 async def age(message: Message, state: FSMContext):
     await state.update_data(age=message.text) # ответ обрабатывается и сохраняется
-    await message.answer('Из какого ты города?') # задаем следующий вопрос
-    await state.set_state(Form.city) # программа ожидает город, чтобы сохранить
+    await message.answer('Из какого ты класса?') # задаем следующий вопрос
+    await state.set_state(Form.grade) # программа ожидает город, чтобы сохранить
 
-@dp.message(Form.city)
-async def city(message: Message, state: FSMContext):
-    await state.update_data(city=message.text) # ответ обрабатывается и сохраняется
+@dp.message(Form.grade)
+async def grade(message: Message, state: FSMContext):
+    await state.update_data(grade=message.text) # ответ обрабатывается и сохраняется
     user_data = await state.get_data() # извлекает все данные, которые были получены и делает словарь
 
-    conn = sqlite3.connect('user_data.db')
+    conn = sqlite3.connect('school_data.db')
     cur = conn.cursor()
     cur.execute('''
-        INSERT INTO users(name, age, city) VALUES (?, ?, ?)''', (user_data['name'], user_data['age'], user_data['city']))
+        INSERT INTO students(name, age, grade) VALUES (?, ?, ?)''', (user_data['name'], user_data['age'], user_data['grade']))
     conn.commit()  # сохраняем изменения
     conn.close()  # закрываем подключение
 
-    async with aiohttp.ClientSession() as session: # создаем асинхронную сессию клиента, прописав "aiohttp.ClientSession"
-        async with session.get(f"http://api.openweathermap.org/data/2.5/weather?q={user_data['city']}&appid={OPENWEATHER_API_KEY}&units=metric") as response:
-            if response.status == 200:
-                weather_data = await response.json()
-                main = weather_data['main'] # main - это основная информация
-                weather = weather_data['weather'][0] # берем описание погодных условий, 0 - первая по счету информация
+    student_info = (f"Имя - {user_data['name']}\n"
+                    f"Возраст - {user_data['age']}\n"
+                    f"Класс - {user_data['grade']}\n")
+    await message.answer(student_info)
 
-                temperature = main['temp']
-                humidity = main['humidity']
-                description = weather['description']
-
-                weather_report = (f"Город - {user_data['city']}\n"
-                                  f"Температура - {temperature}\n"
-                                  f"Влажность воздуха - {humidity}\n"
-                                  f"Описание погоды - {description}")
-                await message.answer(weather_report)
-            else:
-                await message.answer('Не удалось получить данные о погоде.')
-        await state.clear() #В конце подключения к сессии необходимо очистить состояния, используя 'await session.close()'
+    await state.clear()
 
 
 
