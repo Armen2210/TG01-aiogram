@@ -15,7 +15,7 @@ import keyboards as kb
 load_dotenv()
 
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-print("BOT_TOKEN:", repr(BOT_TOKEN))
+
 
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 CITY = os.getenv("CITY", "Moscow")
